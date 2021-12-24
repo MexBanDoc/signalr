@@ -1,5 +1,7 @@
-﻿using BadNews.Elevation;
+﻿using System;
+using BadNews.Elevation;
 using BadNews.ModelBuilders.News;
+using BadNews.Repositories.Comments;
 using BadNews.Repositories.News;
 using BadNews.Repositories.Weather;
 using BadNews.Validation;
@@ -11,14 +13,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using System;
 
 namespace BadNews
 {
     public class Startup
     {
-        private readonly IWebHostEnvironment env;
         private readonly IConfiguration configuration;
+        private readonly IWebHostEnvironment env;
 
         // В конструкторе уже доступна информация об окружении и конфигурация
         public Startup(IWebHostEnvironment env, IConfiguration configuration)
@@ -34,11 +35,9 @@ namespace BadNews
             services.AddSingleton<INewsModelBuilder, NewsModelBuilder>();
             services.AddSingleton<IValidationAttributeAdapterProvider, StopWordsAttributeAdapterProvider>();
             services.AddSingleton<IWeatherForecastRepository, WeatherForecastRepository>();
+            services.AddSingleton<CommentsRepository, CommentsRepository>();
             services.Configure<OpenWeatherOptions>(configuration.GetSection("OpenWeather"));
-            services.AddResponseCompression(options =>
-            {
-                options.EnableForHttps = true;
-            });
+            services.AddResponseCompression(options => { options.EnableForHttps = true; });
             services.AddMemoryCache();
             var mvcBuilder = services.AddControllersWithViews();
             if (env.IsDevelopment())
@@ -55,12 +54,12 @@ namespace BadNews
 
             app.UseHttpsRedirection();
             app.UseResponseCompression();
-            app.UseStaticFiles(new StaticFileOptions()
+            app.UseStaticFiles(new StaticFileOptions
             {
                 OnPrepareResponse = options =>
                 {
                     options.Context.Response.GetTypedHeaders().CacheControl =
-                        new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
+                        new Microsoft.Net.Http.Headers.CacheControlHeaderValue
                         {
                             Public = false,
                             MaxAge = TimeSpan.FromDays(1)
@@ -81,10 +80,8 @@ namespace BadNews
                 });
                 endpoints.MapControllerRoute("default", "{controller=News}/{action=Index}/{id?}");
             });
-            app.MapWhen(context => context.Request.IsElevated(), branchApp =>
-            {
-                branchApp.UseDirectoryBrowser("/files");
-            });
+            app.MapWhen(context => context.Request.IsElevated(),
+                branchApp => { branchApp.UseDirectoryBrowser("/files"); });
 
             // Остальные запросы — 404 Not Found
         }
